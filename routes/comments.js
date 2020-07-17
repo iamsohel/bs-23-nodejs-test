@@ -2,19 +2,44 @@ const express = require("express");
 const router = express.Router();
 const jwtAuth = require("../middleware/jwtAuth");
 const validateObjectId = require("../middleware/validateObjectId");
+const bannedSpammer = require("../middleware/bannedSpammer");
 const roleManager = require("../middleware/roleManager");
 const Comment = require("../models/Comment");
 const BannedComment = require("../models/BannedComment");
 
+// @desc gel all comments
+// @access Public
+router.get("/", async (req, res) => {
+  let sortBy = req.params.sort_by;
+  const comments = await Comment.find().sort({ sortBy: 1 });
+  const resObj = {
+    success: true,
+    data: comments,
+  };
+  res.status(200).send(resObj);
+});
+
 // @route  comment api/comment
 // @desc create new comment
 // @access Private
-router.post("/", jwtAuth, async (req, res) => {
+router.post("/", [jwtAuth, bannedSpammer], async (req, res) => {
   try {
+    const checkBanned = await BannedComment.find({
+      commentId: req.body.postId,
+    });
+    console.log("checkBanned: ", checkBanned);
+    if (checkBanned.length > 0) {
+      const resObj = {
+        success: false,
+        message: "This comment is banned for comment",
+      };
+      return res.status(400).send(resObj);
+    }
     const comment = new Comment({
       text: req.body.text,
       user: req.user.id,
-      postId: req.user.postId,
+      postId: req.body.postId,
+      blogId: req.body.blogId,
     });
     const newComment = await comment.save();
 
@@ -34,7 +59,7 @@ router.post("/", jwtAuth, async (req, res) => {
 
 // @route  comment api/comment/banned/comment_id
 // @access Private
-router.post("/banned/:id", jwtAuth, async (req, res) => {
+router.post("/banned/:id", [jwtAuth, roleManager], async (req, res) => {
   try {
     const bannedComment = new BannedComment({
       commentId: req.params.id,
@@ -58,68 +83,76 @@ router.post("/banned/:id", jwtAuth, async (req, res) => {
 // @route  comment api/comment/up-vote/:comment_id
 // @desc up-vote a comment
 // @access Private
-router.post("/up-vote/:id", [jwtAuth, validateObjectId], async (req, res) => {
-  const comment = await Comment.findById(req.params.id);
-  if (!comment) {
-    const resObj = {
-      success: false,
-      message: "No comment found with given id",
-    };
-    return res.status(400).send(resObj);
-  }
+router.post(
+  "/up-vote/:id",
+  [jwtAuth, validateObjectId, bannedSpammer],
+  async (req, res) => {
+    const comment = await Comment.findById(req.params.id);
+    if (!comment) {
+      const resObj = {
+        success: false,
+        message: "No comment found with given id",
+      };
+      return res.status(400).send(resObj);
+    }
 
-  //check user already liked the comment
-  const checkLiked =
-    comment.upVote.filter((item) => item.user == req.user.id).length > 0;
-  if (checkLiked) {
-    const resObj = {
-      success: false,
-      message: "You already up vote to this the comment",
-    };
-    return res.status(400).send(resObj);
-  }
-  comment.upVote.unshift({ user: req.user.id });
-  const updatedComment = await comment.save();
+    //check user already liked the comment
+    const checkLiked =
+      comment.upVote.filter((item) => item.user == req.user.id).length > 0;
+    if (checkLiked) {
+      const resObj = {
+        success: false,
+        message: "You already up vote to this the comment",
+      };
+      return res.status(400).send(resObj);
+    }
+    comment.upVote.unshift({ user: req.user.id });
+    const updatedComment = await comment.save();
 
-  const resObj = {
-    success: true,
-    data: updatedComment,
-  };
-  res.status(200).send(resObj);
-});
+    const resObj = {
+      success: true,
+      data: updatedComment,
+    };
+    res.status(200).send(resObj);
+  }
+);
 
 // @route  comment api/comment/down-vote/:comment_id
 // @desc down-vote a comment
 // @access Private
-router.post("/down-vote/:id", [jwtAuth, validateObjectId], async (req, res) => {
-  const comment = await Comment.findById(req.params.id);
-  if (!comment) {
-    const resObj = {
-      success: false,
-      message: "No comment found with given id",
-    };
-    return res.status(400).send(resObj);
-  }
+router.post(
+  "/down-vote/:id",
+  [jwtAuth, validateObjectId, bannedSpammer],
+  async (req, res) => {
+    const comment = await Comment.findById(req.params.id);
+    if (!comment) {
+      const resObj = {
+        success: false,
+        message: "No comment found with given id",
+      };
+      return res.status(400).send(resObj);
+    }
 
-  //check user already liked the comment
-  const checkLiked =
-    comment.downVote.filter((item) => item.user == req.user.id).length > 0;
-  if (checkLiked) {
-    const resObj = {
-      success: false,
-      message: "You already down vote to this the comment",
-    };
-    return res.status(400).send(resObj);
-  }
-  comment.downVote.unshift({ user: req.user.id });
-  const updatedComment = await comment.save();
+    //check user already liked the comment
+    const checkLiked =
+      comment.downVote.filter((item) => item.user == req.user.id).length > 0;
+    if (checkLiked) {
+      const resObj = {
+        success: false,
+        message: "You already down vote to this the comment",
+      };
+      return res.status(400).send(resObj);
+    }
+    comment.downVote.unshift({ user: req.user.id });
+    const updatedComment = await comment.save();
 
-  const resObj = {
-    success: true,
-    data: updatedComment,
-  };
-  res.status(200).send(resObj);
-});
+    const resObj = {
+      success: true,
+      data: updatedComment,
+    };
+    res.status(200).send(resObj);
+  }
+);
 
 // @route  DELETE api/comment/commenter/:commenter_id/:comment_id
 // @desc delete a commenter all comments

@@ -1,5 +1,5 @@
 module.exports = function (req, res, next) {
-  if (!req.user.role !== "blogger") {
+  if (req.user.role !== "blogger") {
     const resObj = {
       success: false,
       message: "Access Denied",

@@ -11,6 +11,9 @@ const spammerSchema = new Schema({
     type: Boolean,
     default: false,
   },
+  blogId: {
+    type: String,
+  },
 });
 
 module.exports = Spammer = mongoose.model("spammers", spammerSchema);

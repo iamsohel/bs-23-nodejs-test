@@ -12,6 +12,7 @@ router.post("/", [jwtAuth, roleManager], async (req, res) => {
     const spammer = new Spammer({
       isSpammer: req.body.isSpammer,
       user: req.user.id,
+      blogId: req.body.blogId,
     });
     const newSpammer = await spammer.save();
 
